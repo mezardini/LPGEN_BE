@@ -1,3 +1,4 @@
+from .serializers import UserSerializer, IdeaSerializer
 from .models import CustomUser as User,  Idea
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -7,45 +8,43 @@ from rest_framework.response import Response
 from rest_framework import viewsets
 from mistralai.models.chat_completion import ChatMessage
 from mistralai.client import MistralClient
+from django.http import JsonResponse
 import environ
 env = environ.Env()
 environ.Env.read_env()
-from .serializers import UserSerializer, IdeaSerializer
 # Create your views here.
 
 
 class ContentGeneration(APIView):
     def post(self, request):
-        serializer = IdeaSerializer(data=request.data)
-        if serializer.is_valid():
-            details = request.data.get('details')
-            target_audience = request.data.get('target_audience ')
+        # serializer = IdeaSerializer(data=request.data)
+        # if serializer.is_valid():
+        details = request.data.get('details')
+        target_audience = request.data.get('target_audience')
+        print(f'{details} and {target_audience}')
 
-            if not details and target_audience:
-                return Response({'error': 'Business description and targe audience should be provided.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            try:
-                content_generated = generate_content(details, target_audience)
+        if not details and target_audience:
+            return Response({'error': 'Business description and targe audience should be provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                idea = Idea.objects.create(details=details, target_audience=target_audience, content_generated=content_generated)
-                idea.save()
+        try:
+            content_generated = generate_content(details, target_audience)
 
-                return Response(content_generated, status=status.HTTP_200_OK)
+            idea = Idea.objects.create(
+                details=details, target_audience=target_audience, content_generated=content_generated)
+            idea.save()
 
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        
+            return Response(content_generated, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def generate_content(details: str, target_audience: str):
-
 
     api_key = env('MistralAPIKEY')
     model = "mistral-tiny"
 
     client = MistralClient(api_key=api_key)
-
-    CTC = 'CTA-Button-Copy'
 
     result = {}
 
@@ -126,7 +125,5 @@ def generate_content(details: str, target_audience: str):
         )
 
         result[key] = chat_response.choices[0].message.content
-
-    context = result  # directly use the result dictionary as the context
 
     return result
