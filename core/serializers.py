@@ -12,3 +12,10 @@ class IdeaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Idea
         fields = '__all__'
+
+
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)

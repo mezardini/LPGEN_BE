@@ -69,6 +69,7 @@ class Idea(models.Model):
     target_audience = models.TextField()
     content_generated = models.TextField(blank=True, null=True)
     time_created = models.DateTimeField(auto_now_add=True, null=True)
+    creator = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return self.details

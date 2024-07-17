@@ -1,4 +1,13 @@
-from .serializers import UserSerializer, IdeaSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.models import auth
+from django.contrib.auth import authenticate, login, logout
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from .serializers import UserSerializer, IdeaSerializer, LoginSerializer
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import CustomUser as User,  Idea
 from django.shortcuts import render
 from rest_framework.views import APIView
@@ -127,3 +136,93 @@ def generate_content(details: str, target_audience: str):
         result[key] = chat_response.choices[0].message.content
 
     return result
+
+
+class CreateUserView(APIView):
+    serializer_class = UserSerializer
+    queryset = User.objects.select_related().all()
+
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():  
+            email = request.data.get('email')
+            password = request.data.get('password')
+
+            if User.objects.filter(email=email).exists():
+                return JsonResponse({'detail': 'User already exists!'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not password:
+                return JsonResponse({'detail': 'Password not provided!'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # If validation passes, create the user
+            user = User.objects.create_user(
+                password=password, email=email)
+            user.is_active = True
+            user.save()
+
+            # Return the created user's data
+            return Response({'detail': 'User created successfully'}, status=status.HTTP_201_CREATED)
+        else:
+            # If the serializer is not valid, return the errors
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class LoginUserView(APIView):
+    serializer_class = LoginSerializer
+    queryset = User.objects.select_related().all()
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():  # Correctly call the method here
+            email = request.data.get('email')
+            password = request.data.get('password')
+
+            if not User.objects.filter(email=email).exists():
+                return JsonResponse({'detail': 'User does not exists!'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not password:
+                return JsonResponse({'detail': 'Password not provided!'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = auth.authenticate(request, email=email, password=password)
+
+            if user is not None:
+                auth.login(request, user)
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                response_data = UserSerializer(user).data
+                response_data['access_token'] = access_token
+                response_data['refresh_token'] = str(refresh)
+                print(response_data)
+                return Response(response_data, status=status.HTTP_201_CREATED)
+            else:
+                return JsonResponse({'detail': 'Invalid credentials!'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # If the serializer is not valid, return the errors
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutUserView(APIView):
+    authentication_classes = [SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            auth.logout(request)
+            return Response({'detail': 'User logged out successfully!'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'detail': 'No user is logged in!'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request):
+        user = request.user
+        print(user)
+
+        ideas = Idea.objects.filter(creator=user)
+        serializer = IdeaSerializer(ideas, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
