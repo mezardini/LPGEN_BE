@@ -25,12 +25,16 @@ environ.Env.read_env()
 
 
 class ContentGeneration(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
     def post(self, request):
         # serializer = IdeaSerializer(data=request.data)
         # if serializer.is_valid():
         details = request.data.get('details')
         target_audience = request.data.get('target_audience')
         print(f'{details} and {target_audience}')
+        user = request.user
 
         if not details and target_audience:
             return Response({'error': 'Business description and targe audience should be provided.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -39,7 +43,7 @@ class ContentGeneration(APIView):
             content_generated = generate_content(details, target_audience)
 
             idea = Idea.objects.create(
-                details=details, target_audience=target_audience, content_generated=content_generated)
+                details=details, target_audience=target_audience, content_generated=content_generated, creator=user)
             idea.save()
 
             return Response(content_generated, status=status.HTTP_200_OK)
