@@ -30,7 +30,7 @@ AUTH_USER_MODEL = "core.CustomUser"
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['127.0.0.1',
                  'partial-marti-redditleadhq-5cacd692.koyeb.app', 'localhost']
