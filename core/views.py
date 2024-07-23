@@ -1,3 +1,7 @@
+from .serializers import IdeaSerializer
+from .models import Idea
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import mixins, viewsets
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -18,6 +22,7 @@ from rest_framework import viewsets
 from mistralai.models.chat_completion import ChatMessage
 from mistralai.client import MistralClient
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 import environ
 env = environ.Env()
 environ.Env.read_env()
@@ -171,7 +176,6 @@ class CreateUserView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class LoginUserView(APIView):
     serializer_class = LoginSerializer
     queryset = User.objects.select_related().all()
@@ -224,9 +228,61 @@ class DashboardView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        user = request.user
-        print(user)
+        try:
+            user = request.user
+            print(user)
 
-        ideas = Idea.objects.filter(creator=user)
-        serializer = IdeaSerializer(ideas, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            ideas = Idea.objects.filter(creator=user)
+            serializer = IdeaSerializer(ideas, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Idea.DoesNotExist:
+            return Response({'detail': 'Content not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class ContentView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, idea_id):
+        try:
+            user = request.user
+            idea = Idea.objects.get(creator=user, id=idea_id)
+            data = {
+                'details': idea.details,
+                'target_audience': idea.target_audience,
+                'generatedData': idea.content_generated
+                # Add more fields as needed
+            }
+            return Response(data, status=status.HTTP_200_OK)
+        except Idea.DoesNotExist:
+            return Response({'detail': 'Content not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class IdeaViewSet(
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
+    """Idea ViewSet"""
+
+    serializer_class = IdeaSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    lookup_field = "id"
+
+    def get_queryset(self, request):
+        user = self.request.user
+        user_id = request.headers.get('User-ID')
+
+        return Idea.objects.get(creator=user, id=user_id)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Idea.DoesNotExist:
+            return Response({'detail': 'Content not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+

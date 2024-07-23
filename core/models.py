@@ -67,7 +67,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 class Idea(models.Model):
     details = models.TextField()
     target_audience = models.TextField()
-    content_generated = models.TextField(blank=True, null=True)
+    content_generated = models.JSONField(blank=True, null=True)
     time_created = models.DateTimeField(auto_now_add=True, null=True)
     creator = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
 
